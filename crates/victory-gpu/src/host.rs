@@ -7490,6 +7490,11 @@ impl Host {
     /// as frame `frame` (saved if captures are on). `None` if nothing was
     /// shown; else, in diagnostics builds, whether the frame was black.
     pub(crate) fn present(&self, texture: &ID3D12Resource, state: u32, frame: u64) -> Option<bool> {
+        // One frame, one step of the guest's clock (`VICTORY_GUEST_CLOCK_MS`):
+        // the title's own frame time is what its physics integrates over, and
+        // at a translated frame rate that interval would be several times the
+        // console's. Off, this does nothing.
+        crate::guest_clock::presented();
         // SAFETY: a live resource.
         let desc = unsafe { texture.GetDesc() };
         let Some(format) = swap_format(desc.Format) else {

@@ -43,6 +43,31 @@ impl HleResolver {
     }
 }
 
+/// Whether `dll!symbol` is one of the two timing calls the guest clock
+/// answers (`VICTORY_GUEST_CLOCK_MS`): the counter and its frequency, from
+/// any of the Windows modules that export them.
+fn guest_time(dll: &str, symbol: &ImportSymbol) -> bool {
+    if !victory_gpu::guest_clock::on() {
+        return false;
+    }
+    let module = dll.to_ascii_lowercase();
+    let timing_module = module.starts_with("kernel32")
+        || module.starts_with("kernelbase")
+        || module.starts_with("api-ms-win-core-profile")
+        || module.starts_with("api-ms-win-core-perf");
+    if !timing_module {
+        return false;
+    }
+    let dll = dll;
+    let _ = dll;
+    match symbol {
+        ImportSymbol::Name { name, .. } => {
+            matches!(name.as_str(), "QueryPerformanceCounter" | "QueryPerformanceFrequency")
+        }
+        ImportSymbol::Ordinal(_) => false,
+    }
+}
+
 impl ImportResolver for HleResolver {
     fn resolve(&self, dll: &str, symbol: &ImportSymbol) -> Resolution {
         // Ordinal imports look up `#n`.
@@ -50,6 +75,24 @@ impl ImportResolver for HleResolver {
             return Resolution::Found {
                 address,
                 provenance: Provenance::Hle,
+            };
+        }
+        // The guest's clock (`VICTORY_GUEST_CLOCK_MS`): the title measures its
+        // own frame with this counter, and its physics integrates over what it
+        // reads. With the clock on, a frame is one console step however long
+        // the translated frame takes on the host. Off, the answer is the
+        // host's own, as before.
+        if crate::guest_time(&dll, symbol) {
+            let name = symbol.to_string();
+            let address = match name.as_str() {
+                "QueryPerformanceCounter" => {
+                    victory_gpu::guest_clock::query_performance_counter as *const () as usize
+                }
+                _ => victory_gpu::guest_clock::query_performance_frequency as *const () as usize,
+            };
+            return Resolution::Found {
+                address,
+                provenance: Provenance::Host,
             };
         }
         match self.host.resolve(dll, symbol) {
