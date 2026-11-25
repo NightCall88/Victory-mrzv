@@ -115,7 +115,35 @@ pub extern "system" fn CreateWindowExA(
 /// A top-level window larger than the work area is shrunk to fit, keeping
 /// its proportions, and centred; what it shows is scaled to it (the swap
 /// chain stretches).
+/// `VICTORY_WINDOW_SIZE=WxH` shrinks the window the title asks for before it
+/// is made, keeping its proportions. A console title sizes its window to its
+/// render target (3840x2160 on a Series X); the swap chain and, through it,
+/// the title's own render targets follow that size. On a host whose screen is
+/// that big nothing is fitted, so the world is drawn at 4K: four times the
+/// pixels of a 1080p picture for the same geometry, which is most of the frame
+/// on a card that has to translate every draw. Reporting a smaller display
+/// mode alone does not do it (`VICTORY_DISPLAY_MODE` only changes what the
+/// title is told the monitor is).
+fn wanted_size() -> Option<(i32, i32)> {
+    static SIZE: std::sync::OnceLock<Option<(i32, i32)>> = std::sync::OnceLock::new();
+    *SIZE.get_or_init(|| {
+        let set = std::env::var("VICTORY_WINDOW_SIZE").ok()?;
+        let (w, h) = set.split_once(['x', 'X'])?;
+        let (w, h) = (w.trim().parse::<i32>().ok()?, h.trim().parse::<i32>().ok()?);
+        (w > 0 && h > 0).then_some((w, h))
+    })
+}
+
 fn fit(parent: HWND, x: i32, y: i32, width: i32, height: i32) -> (i32, i32, i32, i32) {
+    if parent.is_null()
+        && let Some((w, h)) = wanted_size()
+        && (w, h) != (width, height)
+    {
+        // The same proportions the title asked for, at the size asked of us.
+        let (w, h) = if width * h >= height * w { (w, (height as i64 * w as i64 / width.max(1) as i64) as i32) } else { ((width as i64 * h as i64 / height.max(1) as i64) as i32, h) };
+        tracing::info!(from = ?(width, height), to = ?(w, h), "title window sized by VICTORY_WINDOW_SIZE");
+        return (x, y, w, h);
+    }
     let mut area = RECT::default();
     // SAFETY: `area` receives the primary monitor's work area.
     let known =

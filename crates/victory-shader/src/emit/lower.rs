@@ -1016,6 +1016,20 @@ fn own_bits_on() -> bool {
     *ON.get_or_init(|| std::env::var_os("VICTORY_WAVE_OWN_BITS").is_none_or(|v| v != "0"))
 }
 
+/// `VICTORY_WAVE_FORCE32=1`: a compute program that would keep 64-lane waves
+/// (an LDS region shared inside the console's wave, a cross-half lane read)
+/// runs in waves of 32 anyway. The split below puts a group barrier before
+/// every LDS access, so the two host waves that stand for one console wave
+/// keep their order; the lanes that cross halves exchange through two dwords
+/// past the program's LDS. A host with 32-lane waves (NVIDIA) refuses
+/// `WaveSize(64)` outright, and a program with no pipeline draws nothing at
+/// all: an approximation that runs beats an exact one that does not. Off by
+/// default; `0` and unset are the same.
+fn force32() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_WAVE_FORCE32").is_some_and(|v| v == "1"))
+}
+
 /// The refusal of a first half of an interpolation whose result is read
 /// as data ([`Lower::interp`]).
 pub(super) const FIRST_HALF: &str = "the first half of an interpolation";
@@ -1342,6 +1356,12 @@ impl<'a> Lower<'a> {
                                     need(b);
                                 }
                             }
+                        }
+                        if !lds_ok && force32() {
+                            // The barriers the split inserts are what makes this
+                            // sound where `all_lane_blocks` could not prove it:
+                            // every thread of the group reaches them.
+                            lds_ok = true;
                         }
                         if lds_ok {
                             wave = 32;

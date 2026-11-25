@@ -252,7 +252,12 @@ pub(crate) fn pc_format(format: u32) -> u32 {
 /// itself in the 16-bit format are skipped ([`stands_in`]); convert them
 /// if a pass turns out to need one.
 pub(crate) fn target_format(format: u32) -> u32 {
-    const STAND_INS: [(u32, u32); 3] = [(86, 28), (115, 28), (67, 10)];
+    // 86 is B5G5R5A1 and 115 is B4G4R4A4: their channels are blue-first, so
+    // their stand-in must be blue-first too. 28 (R8G8B8A8) swapped red and
+    // blue, which read as a red cast and clipped red in twice as many pixels
+    // as blue over every 16-bit full-screen target. 87 is B8G8R8A8: same
+    // order, eight bits a channel.
+    const STAND_INS: [(u32, u32); 3] = [(86, 87), (115, 87), (67, 10)];
     let Some(i) = STAND_INS.iter().position(|&(f, _)| f == format) else {
         return format;
     };

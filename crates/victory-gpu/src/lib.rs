@@ -38,8 +38,12 @@ pub mod object;
 pub mod pipeline;
 #[cfg(windows)]
 mod primitive;
+#[cfg(all(windows, feature = "diagnostics"))]
+mod profile;
 pub mod query;
 pub mod queue;
+#[cfg(windows)]
+mod queue2;
 pub mod resource;
 pub mod root;
 #[cfg(windows)]
@@ -67,3 +71,21 @@ pub use watch::{
     title_memory_reading, title_memory_remapped, title_memory_remapping, title_memory_written,
     writing as kernel_will_write,
 };
+
+// The in-box Windows 10 d3d12.dll offers shader model 6.5 only and refuses
+// directly-indexed descriptor heaps; the Agility SDK redist beside the
+// executable serves 6.6. d3d12.dll looks for these two exported data
+// symbols in the host process image: the version (a number) and the path
+// to the redist (an ASCII string relative to the executable).
+#[repr(transparent)]
+pub struct SdkPath(*const std::ffi::c_char);
+unsafe impl Sync for SdkPath {}
+
+#[unsafe(no_mangle)]
+pub static mut D3D12SDKVersion: u32 = 620;
+
+#[used]
+static SDK_PATH_BYTES: [u8; 9] = [46, 92, 68, 51, 68, 49, 50, 92, 0];
+
+#[unsafe(no_mangle)]
+pub static D3D12SDKPath: SdkPath = SdkPath(SDK_PATH_BYTES.as_ptr() as *const std::ffi::c_char);

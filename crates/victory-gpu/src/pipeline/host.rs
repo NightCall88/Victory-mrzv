@@ -943,9 +943,23 @@ fn root_signature(
         Anonymous: D3D12_VERSIONED_ROOT_SIGNATURE_DESC_0 {
             Desc_1_1: D3D12_ROOT_SIGNATURE_DESC1 {
                 NumParameters: params.len() as u32,
-                pParameters: params.as_ptr(),
+                // D3D12 refuses a root signature whose arrays are empty
+                // but not null (`E_INVALIDARG`; a `Vec::new().as_ptr()` is
+                // a dangling non-null pointer). A shader with no bindings
+                // at all (a vertex shader of ours, the depth-bounds test)
+                // made one: `D3D12SerializeVersionedRootSignature` refused
+                // it, and every pipeline built on it was refused too.
+                pParameters: if params.is_empty() {
+                    std::ptr::null()
+                } else {
+                    params.as_ptr()
+                },
                 NumStaticSamplers: samplers.len() as u32,
-                pStaticSamplers: samplers.as_ptr(),
+                pStaticSamplers: if samplers.is_empty() {
+                    std::ptr::null()
+                } else {
+                    samplers.as_ptr()
+                },
                 Flags: input
                     | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED
                     | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED,
