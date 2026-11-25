@@ -139,7 +139,9 @@ where it is read. The set this fork was measured with is in
 
 The frame line this build prints carries its own breakdown; every number in
 [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md) was read off it or off a sampled
-profile of it.
+profile of it. Every attempt this fork has made — what it changed, the numbers
+it was measured at, and whether it worked — is one file in [test/](test/),
+failed ones included.
 
 Everything upstream of this fork — VIctory's own status, its subsystem table and
 its debugging aids — is unchanged and linked from
@@ -226,7 +228,7 @@ GPL-3.0-or-later. See [LICENSE](LICENSE).
 ## Files
 
 [.cargo/](.cargo), [.githooks/](.githooks), [apps/victory/](apps/victory),
-[crates/](crates), [docs/](docs), [run/](run),
+[crates/](crates), [docs/](docs), [run/](run), [test/](test),
 [tests/fixtures/hle-probe/](tests/fixtures/hle-probe), [xtask/](xtask),
 [.gitattributes](.gitattributes), [.gitignore](.gitignore),
 [.victory-root](.victory-root), [Cargo.lock](Cargo.lock), [Cargo.toml](Cargo.toml),
